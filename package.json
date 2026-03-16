@@ -1,0 +1,12 @@
+{
+  "name": "dropbear",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "scrape": "node scraper/scrape.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^17.3.1"
+  }
+}

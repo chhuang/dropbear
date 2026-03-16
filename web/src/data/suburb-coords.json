@@ -1,0 +1,630 @@
+{
+  "chippendale": {
+    "lat": -33.88539666666667,
+    "lng": 151.20014274509802
+  },
+  "burwood": {
+    "lat": -33.87777620338982,
+    "lng": 151.10294135593227
+  },
+  "north sydney": {
+    "lat": -33.83612189999999,
+    "lng": 151.20766457142855
+  },
+  "waterloo": {
+    "lat": -33.90093643181817,
+    "lng": 151.2093370454545
+  },
+  "chatswood": {
+    "lat": -33.797173350364965,
+    "lng": 151.18029116788327
+  },
+  "surry hills": {
+    "lat": -33.88494561666666,
+    "lng": 151.2123126666667
+  },
+  "hurstville": {
+    "lat": -33.96400644799999,
+    "lng": 151.10226455999992
+  },
+  "mosman": {
+    "lat": -33.82684811258279,
+    "lng": 151.24113317880796
+  },
+  "liverpool": {
+    "lat": -33.92490599130435,
+    "lng": 150.91985443478248
+  },
+  "bondi junction": {
+    "lat": -33.89222207843139,
+    "lng": 151.24970647058822
+  },
+  "newtown": {
+    "lat": -33.89827328125,
+    "lng": 151.17908999999995
+  },
+  "wolli creek": {
+    "lat": -33.93101038461538,
+    "lng": 151.15358415384617
+  },
+  "redfern": {
+    "lat": -33.89290456410256,
+    "lng": 151.2041517948718
+  },
+  "paddington": {
+    "lat": -33.88411547727273,
+    "lng": 151.22794295454545
+  },
+  "blacktown": {
+    "lat": -33.7684474758621,
+    "lng": 150.90939399999988
+  },
+  "double bay": {
+    "lat": -33.87732332352941,
+    "lng": 151.2426088235294
+  },
+  "manly": {
+    "lat": -33.79819270149253,
+    "lng": 151.28604985074622
+  },
+  "bondi": {
+    "lat": -33.89442270833334,
+    "lng": 151.26683583333335
+  },
+  "darlinghurst": {
+    "lat": -33.877351127272725,
+    "lng": 151.21905509090917
+  },
+  "campsie": {
+    "lat": -33.91197311538461,
+    "lng": 151.1019730769231
+  },
+  "zetland": {
+    "lat": -33.90709536734691,
+    "lng": 151.20790204081638
+  },
+  "potts point": {
+    "lat": -33.87211341818181,
+    "lng": 151.2238041818182
+  },
+  "ultimo": {
+    "lat": -33.881191652173904,
+    "lng": 151.1965376086956
+  },
+  "alexandria": {
+    "lat": -33.90702289041094,
+    "lng": 151.19590698630125
+  },
+  "erskineville": {
+    "lat": -33.90313627777778,
+    "lng": 151.18665833333324
+  },
+  "killara": {
+    "lat": -33.76748098245614,
+    "lng": 151.15767964912285
+  },
+  "gordon": {
+    "lat": -33.753443125,
+    "lng": 151.15112781250008
+  },
+  "artarmon": {
+    "lat": -33.80871147619047,
+    "lng": 151.18533285714284
+  },
+  "randwick": {
+    "lat": -33.91184749999999,
+    "lng": 151.2417915625
+  },
+  "maroubra": {
+    "lat": -33.94277220408163,
+    "lng": 151.24416928571435
+  },
+  "leichhardt": {
+    "lat": -33.884396,
+    "lng": 151.16382
+  },
+  "north bondi": {
+    "lat": -33.884,
+    "lng": 151.276
+  },
+  "clovelly": {
+    "lat": -33.914,
+    "lng": 151.252
+  },
+  "ashfield": {
+    "lat": -33.89,
+    "lng": 151.127
+  },
+  "auburn": {
+    "lat": -33.855,
+    "lng": 151.025
+  },
+  "balmain": {
+    "lat": -33.857,
+    "lng": 151.181
+  },
+  "beaconsfield": {
+    "lat": -33.911,
+    "lng": 151.201
+  },
+  "beecroft": {
+    "lat": -33.753,
+    "lng": 151.064
+  },
+  "bellevue hill": {
+    "lat": -33.882,
+    "lng": 151.258
+  },
+  "birchgrove": {
+    "lat": -33.852,
+    "lng": 151.182
+  },
+  "bondi beach": {
+    "lat": -33.889,
+    "lng": 151.273
+  },
+  "bronte": {
+    "lat": -33.903,
+    "lng": 151.264
+  },
+  "cammeray": {
+    "lat": -33.823,
+    "lng": 151.215
+  },
+  "camperdown": {
+    "lat": -33.887,
+    "lng": 151.184
+  },
+  "carlingford": {
+    "lat": -33.776,
+    "lng": 151.048
+  },
+  "castle hill": {
+    "lat": -33.728,
+    "lng": 151.001
+  },
+  "castlecrag": {
+    "lat": -33.802,
+    "lng": 151.216
+  },
+  "centennial park": {
+    "lat": -33.896,
+    "lng": 151.234
+  },
+  "chester hill": {
+    "lat": -33.875,
+    "lng": 150.998
+  },
+  "concord": {
+    "lat": -33.858,
+    "lng": 151.11
+  },
+  "coogee": {
+    "lat": -33.917,
+    "lng": 151.254
+  },
+  "cremorne": {
+    "lat": -33.827,
+    "lng": 151.226
+  },
+  "cronulla": {
+    "lat": -34.057,
+    "lng": 151.155
+  },
+  "crows nest": {
+    "lat": -33.826,
+    "lng": 151.204
+  },
+  "croydon": {
+    "lat": -33.881,
+    "lng": 151.117
+  },
+  "darlington": {
+    "lat": -33.889,
+    "lng": 151.193
+  },
+  "dee why": {
+    "lat": -33.752,
+    "lng": 151.292
+  },
+  "denistone east": {
+    "lat": -33.797,
+    "lng": 151.098
+  },
+  "dover heights": {
+    "lat": -33.875,
+    "lng": 151.282
+  },
+  "drummoyne": {
+    "lat": -33.853,
+    "lng": 151.152
+  },
+  "dulwich hill": {
+    "lat": -33.904,
+    "lng": 151.14
+  },
+  "eastwood": {
+    "lat": -33.791,
+    "lng": 151.085
+  },
+  "elizabeth bay": {
+    "lat": -33.872,
+    "lng": 151.228
+  },
+  "epping": {
+    "lat": -33.773,
+    "lng": 151.076
+  },
+  "five dock": {
+    "lat": -33.867,
+    "lng": 151.122
+  },
+  "forest lodge": {
+    "lat": -33.882,
+    "lng": 151.182
+  },
+  "glebe": {
+    "lat": -33.877,
+    "lng": 151.188
+  },
+  "haymarket": {
+    "lat": -33.881,
+    "lng": 151.206
+  },
+  "hunters hill": {
+    "lat": -33.829,
+    "lng": 151.145
+  },
+  "kensington": {
+    "lat": -33.914,
+    "lng": 151.221
+  },
+  "kirribilli": {
+    "lat": -33.846,
+    "lng": 151.215
+  },
+  "kogarah": {
+    "lat": -33.969,
+    "lng": 151.139
+  },
+  "lavender bay": {
+    "lat": -33.844,
+    "lng": 151.209
+  },
+  "lilyfield": {
+    "lat": -33.871,
+    "lng": 151.16
+  },
+  "lindfield": {
+    "lat": -33.78,
+    "lng": 151.164
+  },
+  "macquarie park": {
+    "lat": -33.779,
+    "lng": 151.13
+  },
+  "marrickville": {
+    "lat": -33.912,
+    "lng": 151.157
+  },
+  "marsfield": {
+    "lat": -33.775,
+    "lng": 151.107
+  },
+  "mcmahons point": {
+    "lat": -33.843,
+    "lng": 151.204
+  },
+  "meadowbank": {
+    "lat": -33.816,
+    "lng": 151.089
+  },
+  "millers point": {
+    "lat": -33.859,
+    "lng": 151.205
+  },
+  "milsons point": {
+    "lat": -33.845,
+    "lng": 151.211
+  },
+  "naremburn": {
+    "lat": -33.817,
+    "lng": 151.202
+  },
+  "neutral bay": {
+    "lat": -33.836,
+    "lng": 151.219
+  },
+  "newington": {
+    "lat": -33.841,
+    "lng": 151.053
+  },
+  "north strathfield": {
+    "lat": -33.86,
+    "lng": 151.09
+  },
+  "northbridge": {
+    "lat": -33.81,
+    "lng": 151.219
+  },
+  "penrith": {
+    "lat": -33.743,
+    "lng": 150.691
+  },
+  "pymble": {
+    "lat": -33.745,
+    "lng": 151.141
+  },
+  "pyrmont": {
+    "lat": -33.871,
+    "lng": 151.194
+  },
+  "queens park": {
+    "lat": -33.899,
+    "lng": 151.248
+  },
+  "regents park": {
+    "lat": -33.883,
+    "lng": 151.031
+  },
+  "rhodes": {
+    "lat": -33.832,
+    "lng": 151.087
+  },
+  "rose bay": {
+    "lat": -33.873,
+    "lng": 151.267
+  },
+  "rosebery": {
+    "lat": -33.922,
+    "lng": 151.208
+  },
+  "roseville": {
+    "lat": -33.783,
+    "lng": 151.183
+  },
+  "rozelle": {
+    "lat": -33.866,
+    "lng": 151.173
+  },
+  "rushcutters bay": {
+    "lat": -33.875,
+    "lng": 151.228
+  },
+  "ryde": {
+    "lat": -33.81,
+    "lng": 151.11
+  },
+  "silverwater": {
+    "lat": -33.836,
+    "lng": 151.06
+  },
+  "st leonards": {
+    "lat": -33.822,
+    "lng": 151.194
+  },
+  "st peters": {
+    "lat": -33.915,
+    "lng": 151.176
+  },
+  "stanmore": {
+    "lat": -33.893,
+    "lng": 151.167
+  },
+  "strathfield": {
+    "lat": -33.876,
+    "lng": 151.083
+  },
+  "summer hill": {
+    "lat": -33.892,
+    "lng": 151.133
+  },
+  "sydenham": {
+    "lat": -33.918,
+    "lng": 151.167
+  },
+  "sydney": {
+    "lat": -33.869,
+    "lng": 151.209
+  },
+  "sydney olympic park": {
+    "lat": -33.837,
+    "lng": 151.07
+  },
+  "tamarama": {
+    "lat": -33.899,
+    "lng": 151.272
+  },
+  "tempe": {
+    "lat": -33.925,
+    "lng": 151.163
+  },
+  "the rocks": {
+    "lat": -33.86,
+    "lng": 151.209
+  },
+  "turramurra": {
+    "lat": -33.732,
+    "lng": 151.128
+  },
+  "vaucluse": {
+    "lat": -33.855,
+    "lng": 151.277
+  },
+  "wahroonga": {
+    "lat": -33.721,
+    "lng": 151.114
+  },
+  "wentworth point": {
+    "lat": -33.83,
+    "lng": 151.076
+  },
+  "willoughby": {
+    "lat": -33.804,
+    "lng": 151.203
+  },
+  "woolloomooloo": {
+    "lat": -33.87,
+    "lng": 151.219
+  },
+  "annandale": {
+    "lat": -33.8833,
+    "lng": 151.1667
+  },
+  "ashbury": {
+    "lat": -33.9,
+    "lng": 151.1333
+  },
+  "enmore": {
+    "lat": -33.9,
+    "lng": 151.1667
+  },
+  "lewisham": {
+    "lat": -33.9,
+    "lng": 151.15
+  },
+  "petersham": {
+    "lat": -33.9,
+    "lng": 151.1333
+  },
+  "abbotsford": {
+    "lat": -33.851,
+    "lng": 151.126
+  },
+  "barangaroo": {
+    "lat": -33.863,
+    "lng": 151.202
+  },
+  "chiswick": {
+    "lat": -33.851,
+    "lng": 151.155
+  },
+  "darling point": {
+    "lat": -33.871,
+    "lng": 151.241
+  },
+  "edgecliff": {
+    "lat": -33.875,
+    "lng": 151.238
+  },
+  "haberfield": {
+    "lat": -33.888,
+    "lng": 151.129
+  },
+  "point piper": {
+    "lat": -33.869,
+    "lng": 151.252
+  },
+  "rodd point": {
+    "lat": -33.858,
+    "lng": 151.139
+  },
+  "russell lea": {
+    "lat": -33.858,
+    "lng": 151.134
+  },
+  "wareemba": {
+    "lat": -33.855,
+    "lng": 151.131
+  },
+  "waverley": {
+    "lat": -33.896,
+    "lng": 151.252
+  },
+  "woollahra": {
+    "lat": -33.886,
+    "lng": 151.241
+  },
+  "parramatta": {
+    "lat": -33.815,
+    "lng": 151.001
+  },
+  "gladesville": {
+    "lat": -33.833,
+    "lng": 151.126
+  },
+  "lane cove": {
+    "lat": -33.81,
+    "lng": 151.1550
+  },
+  "homebush": {
+    "lat": -33.871,
+    "lng": 151.086
+  },
+  "putney": {
+    "lat": -33.853,
+    "lng": 151.103
+  },
+  "huntleys cove": {
+    "lat": -33.838,
+    "lng": 151.131
+  },
+  "henley": {
+    "lat": -33.85,
+    "lng": 151.13
+  },
+  "tennyson point": {
+    "lat": -33.8367,
+    "lng": 151.1389
+  },
+  "breakfast point": {
+    "lat": -33.8564,
+    "lng": 151.1178
+  },
+  "cabarita": {
+    "lat": -33.8533,
+    "lng": 151.1183
+  },
+  "concord west": {
+    "lat": -33.8531,
+    "lng": 151.1017
+  },
+  "mortlake": {
+    "lat": -33.8478,
+    "lng": 151.1078
+  },
+  "lane cove north": {
+    "lat": -33.8158,
+    "lng": 151.1497
+  },
+  "longueville": {
+    "lat": -33.8267,
+    "lng": 151.1656
+  },
+  "riverview": {
+    "lat": -33.8317,
+    "lng": 151.1519
+  },
+  "wollstonecraft": {
+    "lat": -33.845,
+    "lng": 151.1953
+  },
+  "northwood": {
+    "lat": -33.8314,
+    "lng": 151.1739
+  },
+  "linley point": {
+    "lat": -33.8372,
+    "lng": 151.1628
+  },
+  "lane cove west": {
+    "lat": -33.8078,
+    "lng": 151.1372
+  },
+  "waverton": {
+    "lat": -33.8414,
+    "lng": 151.2044
+  },
+  "greenwich": {
+    "lat": -33.8364,
+    "lng": 151.1867
+  },
+  "east ryde": {
+    "lat": -33.8133,
+    "lng": 151.1058
+  },
+  "north ryde": {
+    "lat": -33.8128,
+    "lng": 151.1275
+  }
+}

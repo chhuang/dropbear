@@ -1,0 +1,99 @@
+{
+  "actorSpecification": 1,
+  "name": "domain-com-au-scraper",
+  "title": "Domain.com.au Property Scraper",
+  "description": "Scrape property listings from Domain.com.au - DIY version (no rental fee!)",
+  "version": "1.0",
+  "meta": {
+    "templateId": "ts-start-playwright-crawler"
+  },
+  "tags": [
+    "domain",
+    "australia",
+    "property",
+    "real-estate",
+    "scraper"
+  ],
+  "storages": {
+    "dataset": {
+      "actorSpecification": 1,
+      "title": "Property Listings",
+      "description": "Scraped property listings from Domain.com.au",
+      "fields": {
+        "listing_id": {
+          "title": "Listing ID",
+          "description": "Unique Domain listing ID",
+          "type": "integer"
+        },
+        "url": {
+          "title": "URL",
+          "description": "Full URL to the listing",
+          "type": "string"
+        },
+        "price": {
+          "title": "Price",
+          "description": "Parsed price in dollars",
+          "type": "integer",
+          "nullable": true
+        },
+        "price_text": {
+          "title": "Price Text",
+          "description": "Raw price text from listing",
+          "type": "string"
+        },
+        "address": {
+          "title": "Address",
+          "description": "Full property address",
+          "type": "string"
+        },
+        "suburb": {
+          "title": "Suburb",
+          "description": "Suburb name",
+          "type": "string"
+        },
+        "postcode": {
+          "title": "Postcode",
+          "description": "Australian postcode",
+          "type": "string"
+        },
+        "state": {
+          "title": "State",
+          "description": "Australian state (NSW, VIC, etc.)",
+          "type": "string"
+        },
+        "bedrooms": {
+          "title": "Bedrooms",
+          "description": "Number of bedrooms",
+          "type": "integer",
+          "nullable": true
+        },
+        "bathrooms": {
+          "title": "Bathrooms",
+          "description": "Number of bathrooms",
+          "type": "integer",
+          "nullable": true
+        },
+        "car_spaces": {
+          "title": "Car Spaces",
+          "description": "Number of parking spaces",
+          "type": "integer",
+          "nullable": true
+        },
+        "property_type": {
+          "title": "Property Type",
+          "description": "Type of property (House, Apartment, etc.)",
+          "type": "string",
+          "nullable": true
+        },
+        "image_url": {
+          "title": "Image URL",
+          "description": "URL to listing's main image",
+          "type": "string",
+          "nullable": true
+        }
+      }
+    }
+  },
+  "input": "./input_schema.json",
+  "dockerfile": "./Dockerfile"
+}

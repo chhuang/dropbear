@@ -1,0 +1,83 @@
+{
+  "title": "Domain.com.au Batch Scraper",
+  "description": "Scrape property listings from Domain.com.au - supports batch mode for efficiency",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "suburbs": {
+      "title": "Suburbs (Batch Mode)",
+      "description": "Array of suburbs to scrape in one run (more efficient than multiple single runs)",
+      "type": "array",
+      "editor": "json",
+      "items": {
+        "type": "object",
+        "properties": {
+          "suburb": { 
+            "type": "string", 
+            "title": "Suburb Name",
+            "description": "Name of the suburb to scrape"
+          },
+          "postcode": { 
+            "type": "string", 
+            "title": "Postcode",
+            "description": "Australian postcode"
+          },
+          "state": { 
+            "type": "string", 
+            "title": "State",
+            "default": "nsw",
+            "description": "Australian state code (nsw, vic, qld, etc.)"
+          }
+        },
+        "required": ["suburb", "postcode"]
+      }
+    },
+    "suburb": {
+      "title": "Suburb Name (Single Mode)",
+      "description": "Single suburb to scrape (use 'suburbs' array for batch mode)",
+      "type": "string",
+      "editor": "textfield"
+    },
+    "postcode": {
+      "title": "Postcode (Single Mode)",
+      "description": "Australian postcode for single suburb mode",
+      "type": "string",
+      "editor": "textfield"
+    },
+    "state": {
+      "title": "State",
+      "description": "Australian state code (nsw, vic, qld, etc.)",
+      "type": "string",
+      "default": "nsw",
+      "editor": "select",
+      "enum": ["nsw", "vic", "qld", "wa", "sa", "tas", "act", "nt"],
+      "enumTitles": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"]
+    },
+    "maxRetries": {
+      "title": "Max Retries",
+      "description": "Max retries per suburb on HTTP2 errors",
+      "type": "integer",
+      "default": 5,
+      "editor": "number",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "delayBetweenSuburbs": {
+      "title": "Delay Between Suburbs (ms)",
+      "description": "Delay in milliseconds between suburbs to avoid rate limiting",
+      "type": "integer",
+      "default": 30000,
+      "editor": "number",
+      "minimum": 0,
+      "maximum": 300000
+    },
+    "excludeUnderOffer": {
+      "title": "Exclude Under Offer",
+      "description": "Exclude properties that are under offer",
+      "type": "boolean",
+      "default": true,
+      "editor": "checkbox"
+    }
+  },
+  "required": []
+}
