@@ -1,20 +1,20 @@
 #!/usr/bin/env npx tsx
 /**
- * All-in-one DropBear scraper
- * 1. Validates inputs
- * 2. Calls Apify (supports batch: multiple suburbs in one run)
- * 3. Waits for completion
- * 4. Syncs to DB (including price_history)
- * 5. Records run in apify_runs (one row per suburb)
- * 6. Checks for new drops
+ * DropBear Apify scraper - unified script for single/batch scraping
  * 
  * Usage:
- *   Single: npx tsx cron-scrape.ts <suburb> <postcode> [state]
- *   Batch:  npx tsx cron-scrape.ts --batch burwood:2134 chatswood:2067 parramatta:2150
+ *   Dry run (validation only):  npx tsx apify-scrape.ts --dry-run burwood 2134 NSW
+ *   Single suburb:              npx tsx apify-scrape.ts burwood 2134 NSW
+ *   Batch mode:                 npx tsx apify-scrape.ts --batch burwood:2134 chatswood:2067 manly:2095
  * 
- * Examples:
- *   npx tsx cron-scrape.ts chatswood 2067 NSW
- *   npx tsx cron-scrape.ts --batch burwood:2134 chatswood:2067 manly:2095
+ * What it does:
+ *   1. Validates inputs (suburb, postcode, state)
+ *   2. Constructs correct Domain URLs (ssubs=0, excludeunderoffer=1)
+ *   3. Calls Apify EasyApi actor
+ *   4. Waits for completion
+ *   5. Syncs results to Supabase (listings + price_history)
+ *   6. Records run in apify_runs (one row per suburb)
+ *   7. Detects price drops
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -38,15 +38,15 @@ function validateConfig(config: ScrapeConfig): { valid: boolean; errors: string[
   const errors: string[] = []
   
   if (!config.suburb || !/^[a-zA-Z\s\-]+$/.test(config.suburb)) {
-    errors.push(`INVALID suburb: "${config.suburb}"`)
+    errors.push(`INVALID suburb: "${config.suburb}" - must contain only letters, spaces, hyphens`)
   }
   
   if (!config.postcode || !/^\d{4}$/.test(config.postcode)) {
-    errors.push(`INVALID postcode: "${config.postcode}"`)
+    errors.push(`INVALID postcode: "${config.postcode}" - must be 4 digits`)
   }
   
   if (!VALID_STATES.includes(config.state)) {
-    errors.push(`INVALID state: "${config.state}"`)
+    errors.push(`INVALID state: "${config.state}" - must be one of: ${VALID_STATES.join(', ')}`)
   }
   
   return { valid: errors.length === 0, errors }
@@ -54,7 +54,33 @@ function validateConfig(config: ScrapeConfig): { valid: boolean; errors: string[
 
 function constructUrl(config: ScrapeConfig): string {
   const suburbSlug = `${config.suburb.toLowerCase().replace(/\s+/g, '-')}-${config.state.toLowerCase()}-${config.postcode}`
-  return `https://www.domain.com.au/sale/${suburbSlug}/?excludeunderoffer=1&ssubs=0`
+  const params = new URLSearchParams({
+    excludeunderoffer: '1',
+    ssubs: '0'
+  })
+  return `https://www.domain.com.au/sale/${suburbSlug}/?${params.toString()}`
+}
+
+function validateUrl(url: string, config: ScrapeConfig): { valid: boolean; errors: string[] } {
+  const errors: string[] = []
+  
+  if (!url.includes('ssubs=0')) {
+    errors.push('MISSING: ssubs=0 - will include surrounding suburbs (wastes money!)')
+  }
+  
+  if (!url.includes('excludeunderoffer=1')) {
+    errors.push('MISSING: excludeunderoffer=1 - will include properties under offer')
+  }
+  
+  if (!url.includes(config.postcode)) {
+    errors.push(`MISSING: postcode ${config.postcode} in URL`)
+  }
+  
+  if (!url.match(/domain\.com\.au\/sale\//)) {
+    errors.push('INVALID: not a valid Domain.com.au sale URL')
+  }
+  
+  return { valid: errors.length === 0, errors }
 }
 
 function parsePrice(text: any): number | null {
@@ -92,12 +118,9 @@ function parsePrice(text: any): number | null {
 }
 
 function extractSuburbFromItem(item: any): string | null {
-  // Try to extract suburb from the item
-  // Domain items may have suburb in different fields
   if (item.suburb) return item.suburb.toLowerCase()
   if (item.address?.suburb) return item.address.suburb.toLowerCase()
   
-  // Fallback: extract from URL path
   const urlMatch = item.url?.match(/\/sale\/([a-z\-]+)-[a-z]{2,3}-\d+/i)
   if (urlMatch) return urlMatch[1].replace(/-/g, ' ')
   
@@ -116,7 +139,11 @@ async function startApifyRun(urls: string[]): Promise<string> {
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }
   )
   
-  if (!res.ok) throw new Error(`Apify API error: ${res.status}`)
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Apify API error: ${res.status} - ${text}`)
+  }
+  
   const data = await res.json()
   return data.data.id
 }
@@ -153,10 +180,8 @@ async function syncToDatabase(
 ): Promise<Map<string, { new: number; updated: number; drops: any[] }>> {
   const results = new Map<string, { new: number; updated: number; drops: any[] }>()
   
-  // Build suburb -> config mapping
   const suburbConfig = new Map(configs.map(c => [c.suburb.toLowerCase(), c]))
   
-  // Get all existing listings for these suburbs
   const suburbs = configs.map(c => c.suburb.toLowerCase())
   const { data: existingListings } = await supabase
     .from('listings')
@@ -171,10 +196,6 @@ async function syncToDatabase(
     })
   }
   
-  // Track which listings we see in this scrape
-  const seenListings = new Set<string>()
-  
-  // Process items
   for (const item of items) {
     if (!item.url) continue
     
@@ -189,12 +210,9 @@ async function syncToDatabase(
     const address = item.address?.value || item.address || ''
     const key = `${itemSuburb}:${listingId}`
     
-    seenListings.add(key)
-    
     if (existingMap.has(key)) {
       const existing = existingMap.get(key)!
       
-      // Update listing
       await supabase
         .from('listings')
         .update({ 
@@ -204,7 +222,6 @@ async function syncToDatabase(
         })
         .eq('listing_id', listingId)
       
-      // Check for drop
       if (existing.initial_price && price && price < existing.initial_price) {
         const drops = results.get(itemSuburb)?.drops || []
         drops.push({
@@ -219,7 +236,6 @@ async function syncToDatabase(
         })
       }
       
-      // Write to price_history
       if (price !== null) {
         await supabase.from('listings_price_history').insert({
           listing_id: listingId,
@@ -231,7 +247,6 @@ async function syncToDatabase(
       const curr = results.get(itemSuburb) || { new: 0, updated: 0, drops: [] }
       results.set(itemSuburb, { ...curr, updated: curr.updated + 1 })
     } else {
-      // Insert new listing
       await supabase.from('listings').insert({
         listing_id: listingId,
         suburb: itemSuburb,
@@ -248,7 +263,6 @@ async function syncToDatabase(
         last_seen_at: new Date().toISOString()
       })
       
-      // Write to price_history
       if (price !== null) {
         await supabase.from('listings_price_history').insert({
           listing_id: listingId,
@@ -261,9 +275,6 @@ async function syncToDatabase(
       results.set(itemSuburb, { ...curr, new: curr.new + 1 })
     }
   }
-  
-  // Mark listings not seen as stale (update last_seen_at to old value, we don't delete)
-  // We could track "active" by comparing last_seen_at to scrape time, but for now just leave them
   
   return results
 }
@@ -282,9 +293,10 @@ async function recordRun(
       apify_run_id: apifyRunId,
       suburb: config.suburb.toLowerCase(),
       postcode: config.postcode,
-      dataset_id: datasetId,
+      apify_dataset_id: datasetId,
+      started_at: new Date().toISOString(),
       finished_at: new Date().toISOString(),
-      status: 'completed',
+      trigger: 'manual',
       listings_found: result.new + result.updated,
       listings_new: result.new
     })
@@ -294,11 +306,15 @@ async function recordRun(
 async function main() {
   const args = process.argv.slice(2)
   
+  const dryRun = args.includes('--dry-run')
+  const batchMode = args.includes('--batch')
+  
   let configs: ScrapeConfig[] = []
   
-  if (args[0] === '--batch') {
+  if (batchMode) {
     // Batch mode: --batch burwood:2134 chatswood:2067
-    for (const arg of args.slice(1)) {
+    const batchArgs = args.filter(a => a !== '--batch' && a !== '--dry-run')
+    for (const arg of batchArgs) {
       const [suburb, postcode, state = 'NSW'] = arg.split(':')
       configs.push({
         suburb: suburb.toLowerCase().trim(),
@@ -308,42 +324,67 @@ async function main() {
     }
   } else {
     // Single mode: burwood 2134 NSW
-    if (args.length < 2) {
+    const filteredArgs = args.filter(a => a !== '--dry-run')
+    if (filteredArgs.length < 2) {
       console.error('Usage:')
-      console.error('  Single: npx tsx cron-scrape.ts <suburb> <postcode> [state]')
-      console.error('  Batch:  npx tsx cron-scrape.ts --batch burwood:2134 chatswood:2067')
+      console.error('  Dry run:  npx tsx apify-scrape.ts --dry-run <suburb> <postcode> [state]')
+      console.error('  Single:   npx tsx apify-scrape.ts <suburb> <postcode> [state]')
+      console.error('  Batch:    npx tsx apify-scrape.ts --batch burwood:2134 chatswood:2067')
       process.exit(1)
     }
     
     configs.push({
-      suburb: args[0].toLowerCase().trim(),
-      postcode: args[1].trim(),
-      state: (args[2] || 'NSW').toUpperCase()
+      suburb: filteredArgs[0].toLowerCase().trim(),
+      postcode: filteredArgs[1].trim(),
+      state: (filteredArgs[2] || 'NSW').toUpperCase()
     })
   }
   
-  console.log(`\n🐨 DropBear Scrape`)
+  console.log(`\n🐨 DropBear Scraper`)
   console.log(`📍 ${configs.length} suburb(s): ${configs.map(c => `${c.suburb} ${c.postcode}`).join(', ')}`)
+  if (dryRun) console.log('🧪 DRY RUN MODE - validation only, no Apify call')
   
-  // Validate all
+  // Validate all configs
   for (const config of configs) {
     const validation = validateConfig(config)
     if (!validation.valid) {
       console.error(`\n❌ VALIDATION FAILED for ${config.suburb}:`)
-      validation.errors.forEach(e => console.error(`   ${e}`))
+      validation.errors.forEach(e => console.error(`   - ${e}`))
       process.exit(1)
     }
   }
   
-  // Construct URLs
+  // Construct and validate URLs
   const urls = configs.map(c => constructUrl(c))
-  urls.forEach((url, i) => console.log(`🔗 [${i + 1}] ${url}`))
+  for (let i = 0; i < configs.length; i++) {
+    const config = configs[i]
+    const url = urls[i]
+    const urlValidation = validateUrl(url, config)
+    
+    if (!urlValidation.valid) {
+      console.error(`\n❌ URL VALIDATION FAILED for ${config.suburb}:`)
+      urlValidation.errors.forEach(e => console.error(`   - ${e}`))
+      console.error('\n🛑 Aborting to prevent wasted Apify credits')
+      process.exit(1)
+    }
+    
+    console.log(`\n🔗 [${i + 1}] ${url}`)
+    console.log('   ✅ ssubs=0 (excludes surrounding suburbs)')
+    console.log('   ✅ excludeunderoffer=1 (excludes under offer)')
+  }
+  
+  if (dryRun) {
+    console.log('\n🧪 DRY RUN COMPLETE - no Apify call made')
+    console.log('   Run without --dry-run to start actual scrape')
+    process.exit(0)
+  }
   
   try {
     // Start Apify run
-    console.log(`\n🚀 Starting Apify run (${configs.length} suburbs in one batch)...`)
+    console.log(`\n🚀 Starting Apify run (${configs.length} suburb(s))...`)
     const runId = await startApifyRun(urls)
     console.log(`📊 Run ID: ${runId}`)
+    console.log(`📈 Monitor: https://console.apify.com/actors/runs/${runId}`)
     
     // Wait for completion
     console.log(`⏳ Waiting for completion...`)

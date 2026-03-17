@@ -113,19 +113,19 @@ https://www.domain.com.au/sale/burwood-nsw-2134/?excludeunderoffer=1&ssubs=0
 
 | Script | Purpose |
 |--------|---------|
-| scripts/safe-scrape.ts | Validate URL + start Apify run (no sync) |
-| scripts/cron-scrape.ts | Full pipeline: scrape → wait → sync → detect drops |
+| scripts/apify-scrape.ts | Unified scraper: validate → scrape → sync → detect drops |
+| scripts/utils/ | Ad-hoc query scripts (check-stale, check-drops, etc.) |
 
 Usage:
 ```bash
-# Validation only (free)
-npx tsx scripts/safe-scrape.ts burwood 2134 NSW --dry-run
+# Validation only (free, no Apify call)
+npx tsx scripts/apify-scrape.ts --dry-run burwood 2134 NSW
 
 # Single suburb
-npx tsx scripts/cron-scrape.ts burwood 2134 NSW
+npx tsx scripts/apify-scrape.ts burwood 2134 NSW
 
 # Batch mode (multiple suburbs, one Apify run - saves money!)
-npx tsx scripts/cron-scrape.ts --batch burwood:2134 chatswood:2067 manly:2095
+npx tsx scripts/apify-scrape.ts --batch burwood:2134 chatswood:2067 manly:2095
 ```
 
 ---
