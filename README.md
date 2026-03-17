@@ -12,7 +12,7 @@ NSW real estate price drop tracker. Catches falling prices like a drop bear.
 Domain.com.au → Apify (scrape) → Supabase (store) → Price Drop Detection
 ```
 
-Track Sydney property listings and detect price drops over time.
+Track property listings and detect price drops over time.
 
 ---
 
@@ -33,7 +33,8 @@ Track Sydney property listings and detect price drops over time.
 | Column | Type | Notes |
 |--------|------|-------|
 | id | uuid | PK |
-| listing_id | bigint | Extracted from Domain URL, unique |
+| listing_id | bigint | Extracted from Domain URL |
+| source | text | Default: "domain" |
 | suburb | text | e.g. "burwood" |
 | address | text | Full address |
 | initial_price | bigint | First price ever seen (nullable) |
@@ -44,9 +45,10 @@ Track Sydney property listings and detect price drops over time.
 | car_spaces | int | |
 | property_type | text | apartment, house, etc. |
 | url | text | Domain.com.au URL |
-| is_active | boolean | False if not in latest scrape |
-| first_seen_at | timestamptz | |
-| last_seen_at | timestamptz | |
+| first_seen_at | timestamptz | When we first saw this listing |
+| last_seen_at | timestamptz | When we last saw this listing |
+
+**Note:** Use `last_seen_at` to determine if a listing is still active. Old `last_seen_at` = listing disappeared.
 
 ### listings_price_history (audit trail)
 
@@ -54,25 +56,30 @@ Track Sydney property listings and detect price drops over time.
 |--------|------|-------|
 | id | uuid | PK |
 | listing_id | bigint | FK to listings |
+| source | text | Default: "domain" |
 | price | bigint | Observed price (nullable) |
 | price_text | text | Raw price text |
 | observed_at | timestamptz | Auto-generated |
 
 Every scrape writes to this table, even if price is same/null.
 
-### apify_runs (scrape tracking - optional)
+### apify_runs (scrape tracking)
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | uuid | PK |
+| apify_run_id | text | Apify run ID (shared in batch) |
 | suburb | text | |
-| run_id | text | Apify run ID |
+| postcode | text | |
 | dataset_id | text | Apify dataset ID |
 | started_at | timestamptz | |
 | finished_at | timestamptz | |
 | status | text | running/completed/failed |
 | listings_found | int | |
+| listings_new | int | |
 | error | text | |
+
+**Batch support:** When scraping multiple suburbs in one Apify run, each suburb gets its own row with the same `apify_run_id`.
 
 ---
 
@@ -87,7 +94,7 @@ https://www.domain.com.au/sale/{suburb}-{state}-{postcode}/?excludeunderoffer=1&
 | Param | Value | Purpose |
 |-------|-------|---------|
 | excludeunderoffer | 1 | Exclude properties under offer |
-| ssubs | 0 | Exclude surrounding suburbs |
+| ssubs | 0 | **CRITICAL** - Exclude surrounding suburbs |
 
 Example:
 ```
@@ -114,11 +121,11 @@ Usage:
 # Validation only (free)
 npx tsx scripts/safe-scrape.ts burwood 2134 NSW --dry-run
 
-# Start scrape only
-npx tsx scripts/safe-scrape.ts burwood 2134 NSW
-
-# Full pipeline (recommended)
+# Single suburb
 npx tsx scripts/cron-scrape.ts burwood 2134 NSW
+
+# Batch mode (multiple suburbs, one Apify run - saves money!)
+npx tsx scripts/cron-scrape.ts --batch burwood:2134 chatswood:2067 manly:2095
 ```
 
 ---
@@ -129,7 +136,7 @@ npx tsx scripts/cron-scrape.ts burwood 2134 NSW
 
 Extract from Domain URL:
 ```
-https://www.domain.com.au/2018221234 → listing_id = 2018221234
+https://www.domain.com.au/...-2018221234 → listing_id = 2018221234
 ```
 
 ### Price Parsing Rules
@@ -153,19 +160,20 @@ https://www.domain.com.au/2018221234 → listing_id = 2018221234
 For each item from Apify:
   1. Extract listing_id from URL
   2. Parse price using rules above
+  3. Detect suburb from item data
   
-  3. If listing EXISTS in DB:
+  4. If listing EXISTS in DB:
      - Update current_price
      - Update price_text
-     - Set is_active = true
+     - Update last_seen_at = NOW()
      - Write to price_history (always)
      - Check for drop: current < initial
   
-  4. If listing is NEW:
+  5. If listing is NEW:
      - Insert with initial_price = current_price
+     - Set first_seen_at = NOW()
+     - Set last_seen_at = NOW()
      - Write to price_history (always)
-  
-  5. Mark listings not in scrape as is_active = false
 ```
 
 ### No-Price Listings
@@ -173,6 +181,14 @@ For each item from Apify:
 - Store with null price - Do not skip
 - Reason: Track existence, detect when price appears later
 - Still write to price_history with null price
+
+### Determining Active Listings
+
+A listing is "active" if it appeared in a recent scrape:
+```sql
+SELECT * FROM listings 
+WHERE last_seen_at > NOW() - INTERVAL '7 days'
+```
 
 ---
 
@@ -182,42 +198,36 @@ For each item from Apify:
 
 A drop = current_price < initial_price
 
-- initial_price = first price ever seen for this listing
+- initial_price = first price we ever saw for this listing
 - current_price = latest price from most recent scrape
 
-### Detection Scripts
-
-| Script | Purpose |
-|--------|---------|
-| check-drops.ts | Find ALL listings with drops |
-| check-new-drops.ts | Find drops from recent sync (last hour) |
-
-Note: Drops are detected during sync in cron-scrape.ts.
+**Note:** We can only detect drops AFTER we start tracking. Historical drops before our first scrape are invisible.
 
 ---
 
-## Suburbs
+## Smart Scraping Strategy
 
-### Active (to be scraped)
+### Rules
 
-| Suburb | Postcode | State |
-|--------|----------|-------|
-| burwood | 2134 | NSW |
-| chatswood | 2067 | NSW |
-| parramatta | 2150 | NSW |
-| liverpool | 2170 | NSW |
-| manly | 2095 | NSW |
-| bondi | 2026 | NSW |
-| cronulla | 2230 | NSW |
-| castle hill | 2154 | NSW |
-| kogarah | 2217 | NSW |
-| potts point | 2011 | NSW |
+| Rule | Reason |
+|------|--------|
+| Never scrape same suburb within 7 days | Wastes money |
+| Skip suburbs with <5 listings | Low value |
+| Use batch mode for multiple suburbs | Saves money (one Apify run) |
 
-### Adding New Suburbs
+### Budget Math
 
-1. Verify URL works: npx tsx safe-scrape.ts <suburb> <postcode> NSW --dry-run
-2. Run first scrape: npx tsx cron-scrape.ts <suburb> <postcode> NSW
-3. Add to active list above
+- $29/mo plan = ~$0.14 per run
+- Batch mode: 10 suburbs in 1 run = $0.14 (vs $1.40 for 10 separate runs)
+- Safe budget: ~200 runs/month
+
+### Priority Formula
+
+```
+Priority Score = listing_count × (days_since_last_scrape / 7)
+```
+
+Higher listings + stale data = higher priority
 
 ---
 
@@ -227,22 +237,7 @@ Note: Drops are detected during sync in cron-scrape.ts.
 
 - ~$0.14 per scrape run
 - Dataset retained for ~7 days
-
-### Smart Scraping Rules
-
-| Rule | Reason |
-|------|--------|
-| Never scrape same suburb within 7 days | Wastes money |
-| Skip suburbs with <5 listings | Low value |
-| Max 12-15 suburbs/day | Stay within $29/mo budget |
-
-### Priority Formula
-
-```
-Priority Score = listing_count x (days_since_last_scrape / 7)
-```
-
-Higher listings + stale data = higher priority
+- Batch mode strongly recommended for multiple suburbs
 
 ---
 
@@ -260,8 +255,9 @@ Higher listings + stale data = higher priority
 
 | Path | Purpose |
 |------|---------|
-| /root/.openclaw/workspace/projects/dropbear/ | Project root |
-| scripts/ | Scraping & sync scripts |
+| scripts/cron-scrape.ts | Main scraper (single + batch) |
+| scripts/safe-scrape.ts | Validation-only scraper |
+| scripts/utils/ | Ad-hoc query scripts |
 | web/ | Next.js frontend |
 | supabase/ | Schema migrations |
 
@@ -271,22 +267,22 @@ Higher listings + stale data = higher priority
 
 | Component | Status |
 |-----------|--------|
-| Database schema | Ready |
+| Database schema | Ready (pending migration) |
 | Scraping scripts | Ready |
 | Sync logic | Ready |
 | Drop detection | Ready |
+| Batch support | Ready |
 | Web frontend | Not running |
 | Cron automation | Not scheduled |
-| Notifications | Not implemented |
 
 ---
 
 ## Next Steps
 
-1. Start web frontend
-2. Test scrape + sync on one suburb
+1. Run migration: `supabase/migrations/002_cleanup_schema.sql`
+2. Test batch scrape: `npx tsx scripts/cron-scrape.ts --batch burwood:2134 chatswood:2067`
 3. Verify drop detection works
-4. Set up cron jobs (after manual testing complete)
+4. Set up cron jobs (after testing)
 
 ---
 

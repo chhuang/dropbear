@@ -26,11 +26,11 @@ async function main() {
     }
   }
   
-  // Get listing counts per suburb
+  // Get listing counts per suburb (active = seen in last 30 days)
   const { data: listings, error: listingsError } = await supabase
     .from('listings')
     .select('suburb')
-    .eq('is_active', true)
+    .gt('last_seen_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
   
   if (listingsError) {
     console.error('Error fetching listings:', listingsError)

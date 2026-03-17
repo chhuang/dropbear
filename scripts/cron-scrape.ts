@@ -1,14 +1,20 @@
 #!/usr/bin/env npx tsx
 /**
- * All-in-one DropBear scraper for cron jobs
+ * All-in-one DropBear scraper
  * 1. Validates inputs
- * 2. Calls Apify
+ * 2. Calls Apify (supports batch: multiple suburbs in one run)
  * 3. Waits for completion
  * 4. Syncs to DB (including price_history)
- * 5. Checks for new drops
+ * 5. Records run in apify_runs (one row per suburb)
+ * 6. Checks for new drops
  * 
- * Usage: npx tsx cron-scrape.ts <suburb> <postcode> [state]
- * Example: npx tsx cron-scrape.ts chatswood 2067 NSW
+ * Usage:
+ *   Single: npx tsx cron-scrape.ts <suburb> <postcode> [state]
+ *   Batch:  npx tsx cron-scrape.ts --batch burwood:2134 chatswood:2067 parramatta:2150
+ * 
+ * Examples:
+ *   npx tsx cron-scrape.ts chatswood 2067 NSW
+ *   npx tsx cron-scrape.ts --batch burwood:2134 chatswood:2067 manly:2095
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -85,9 +91,22 @@ function parsePrice(text: any): number | null {
   return null
 }
 
-async function startApifyRun(url: string): Promise<string> {
+function extractSuburbFromItem(item: any): string | null {
+  // Try to extract suburb from the item
+  // Domain items may have suburb in different fields
+  if (item.suburb) return item.suburb.toLowerCase()
+  if (item.address?.suburb) return item.address.suburb.toLowerCase()
+  
+  // Fallback: extract from URL path
+  const urlMatch = item.url?.match(/\/sale\/([a-z\-]+)-[a-z]{2,3}-\d+/i)
+  if (urlMatch) return urlMatch[1].replace(/-/g, ' ')
+  
+  return null
+}
+
+async function startApifyRun(urls: string[]): Promise<string> {
   const input = {
-    searchUrls: [url],
+    searchUrls: urls,
     maxItems: 50000,
     proxyConfiguration: { useApifyProxy: true }
   }
@@ -103,7 +122,7 @@ async function startApifyRun(url: string): Promise<string> {
 }
 
 async function waitForCompletion(runId: string): Promise<string> {
-  const maxWait = 120000 // 2 minutes
+  const maxWait = 180000 // 3 minutes
   const startTime = Date.now()
   
   while (Date.now() - startTime < maxWait) {
@@ -115,7 +134,7 @@ async function waitForCompletion(runId: string): Promise<string> {
       throw new Error(`Apify run ${data.data.status}: ${data.data.statusMessage}`)
     }
     
-    await new Promise(r => setTimeout(r, 5000)) // Wait 5s
+    await new Promise(r => setTimeout(r, 5000))
   }
   
   throw new Error('Timeout waiting for Apify run')
@@ -128,58 +147,95 @@ async function fetchDataset(datasetId: string): Promise<any[]> {
   return res.json()
 }
 
-async function syncToDatabase(suburb: string, items: any[]): Promise<{ new: number; updated: number; drops: any[] }> {
+async function syncToDatabase(
+  items: any[],
+  configs: ScrapeConfig[]
+): Promise<Map<string, { new: number; updated: number; drops: any[] }>> {
+  const results = new Map<string, { new: number; updated: number; drops: any[] }>()
+  
+  // Build suburb -> config mapping
+  const suburbConfig = new Map(configs.map(c => [c.suburb.toLowerCase(), c]))
+  
+  // Get all existing listings for these suburbs
+  const suburbs = configs.map(c => c.suburb.toLowerCase())
   const { data: existingListings } = await supabase
     .from('listings')
-    .select('listing_id, initial_price, current_price')
-    .eq('suburb', suburb)
+    .select('listing_id, suburb, initial_price, current_price')
+    .in('suburb', suburbs)
   
-  const existingIds = new Set(existingListings?.map(l => l.listing_id) || [])
-  const existingPrices = new Map(existingListings?.map(l => [l.listing_id, l.current_price]) || [])
+  const existingMap = new Map<string, { initial_price: number | null; current_price: number | null }>()
+  for (const l of existingListings || []) {
+    existingMap.set(`${l.suburb}:${l.listing_id}`, {
+      initial_price: l.initial_price,
+      current_price: l.current_price
+    })
+  }
   
-  let newCount = 0
-  let updateCount = 0
-  const drops: any[] = []
+  // Track which listings we see in this scrape
+  const seenListings = new Set<string>()
   
+  // Process items
   for (const item of items) {
     if (!item.url) continue
     
     const listingId = parseInt(item.url.match(/-(\d+)$/)?.[1] || '0')
     if (!listingId) continue
     
+    const itemSuburb = extractSuburbFromItem(item)
+    if (!itemSuburb || !suburbConfig.has(itemSuburb)) continue
+    
+    const config = suburbConfig.get(itemSuburb)!
     const price = parsePrice(item.price)
     const address = item.address?.value || item.address || ''
+    const key = `${itemSuburb}:${listingId}`
     
-    if (existingIds.has(listingId)) {
-      const oldPrice = existingPrices.get(listingId)
+    seenListings.add(key)
+    
+    if (existingMap.has(key)) {
+      const existing = existingMap.get(key)!
       
       // Update listing
       await supabase
         .from('listings')
-        .update({ current_price: price, price_text: item.price, is_active: true })
+        .update({ 
+          current_price: price, 
+          price_text: item.price,
+          last_seen_at: new Date().toISOString()
+        })
         .eq('listing_id', listingId)
       
       // Check for drop
-      if (oldPrice && price && price < oldPrice) {
-        drops.push({ listing_id: listingId, address, old_price: oldPrice, new_price: price })
+      if (existing.initial_price && price && price < existing.initial_price) {
+        const drops = results.get(itemSuburb)?.drops || []
+        drops.push({
+          listing_id: listingId,
+          address,
+          old_price: existing.initial_price,
+          new_price: price
+        })
+        results.set(itemSuburb, {
+          ...results.get(itemSuburb) || { new: 0, updated: 0, drops: [] },
+          drops
+        })
       }
       
       // Write to price_history
-      if (price) {
+      if (price !== null) {
         await supabase.from('listings_price_history').insert({
           listing_id: listingId,
-          price: price,
+          price,
           price_text: item.price
         })
       }
       
-      updateCount++
+      const curr = results.get(itemSuburb) || { new: 0, updated: 0, drops: [] }
+      results.set(itemSuburb, { ...curr, updated: curr.updated + 1 })
     } else {
       // Insert new listing
       await supabase.from('listings').insert({
         listing_id: listingId,
-        suburb: suburb,
-        address: address,
+        suburb: itemSuburb,
+        address,
         initial_price: price,
         current_price: price,
         price_text: item.price,
@@ -188,58 +244,105 @@ async function syncToDatabase(suburb: string, items: any[]): Promise<{ new: numb
         car_spaces: item.features?.parking,
         property_type: item.features?.propertyTypeFormatted?.split('/')[0]?.trim(),
         url: item.url,
-        is_active: true
+        first_seen_at: new Date().toISOString(),
+        last_seen_at: new Date().toISOString()
       })
       
-      // Write initial price to history
-      if (price) {
+      // Write to price_history
+      if (price !== null) {
         await supabase.from('listings_price_history').insert({
           listing_id: listingId,
-          price: price,
+          price,
           price_text: item.price
         })
       }
       
-      newCount++
+      const curr = results.get(itemSuburb) || { new: 0, updated: 0, drops: [] }
+      results.set(itemSuburb, { ...curr, new: curr.new + 1 })
     }
   }
   
-  return { new: newCount, updated: updateCount, drops }
+  // Mark listings not seen as stale (update last_seen_at to old value, we don't delete)
+  // We could track "active" by comparing last_seen_at to scrape time, but for now just leave them
+  
+  return results
+}
+
+async function recordRun(
+  apifyRunId: string,
+  datasetId: string,
+  configs: ScrapeConfig[],
+  results: Map<string, { new: number; updated: number; drops: any[] }>,
+  itemsCount: number
+) {
+  for (const config of configs) {
+    const result = results.get(config.suburb.toLowerCase()) || { new: 0, updated: 0, drops: [] }
+    
+    await supabase.from('apify_runs').insert({
+      apify_run_id: apifyRunId,
+      suburb: config.suburb.toLowerCase(),
+      postcode: config.postcode,
+      dataset_id: datasetId,
+      finished_at: new Date().toISOString(),
+      status: 'completed',
+      listings_found: result.new + result.updated,
+      listings_new: result.new
+    })
+  }
 }
 
 async function main() {
   const args = process.argv.slice(2)
   
-  if (args.length < 2) {
-    console.error('Usage: npx tsx cron-scrape.ts <suburb> <postcode> [state]')
-    process.exit(1)
+  let configs: ScrapeConfig[] = []
+  
+  if (args[0] === '--batch') {
+    // Batch mode: --batch burwood:2134 chatswood:2067
+    for (const arg of args.slice(1)) {
+      const [suburb, postcode, state = 'NSW'] = arg.split(':')
+      configs.push({
+        suburb: suburb.toLowerCase().trim(),
+        postcode: postcode.trim(),
+        state: state.toUpperCase()
+      })
+    }
+  } else {
+    // Single mode: burwood 2134 NSW
+    if (args.length < 2) {
+      console.error('Usage:')
+      console.error('  Single: npx tsx cron-scrape.ts <suburb> <postcode> [state]')
+      console.error('  Batch:  npx tsx cron-scrape.ts --batch burwood:2134 chatswood:2067')
+      process.exit(1)
+    }
+    
+    configs.push({
+      suburb: args[0].toLowerCase().trim(),
+      postcode: args[1].trim(),
+      state: (args[2] || 'NSW').toUpperCase()
+    })
   }
   
-  const config: ScrapeConfig = {
-    suburb: args[0].toLowerCase().trim(),
-    postcode: args[1].trim(),
-    state: (args[2] || 'NSW').toUpperCase()
+  console.log(`\n🐨 DropBear Scrape`)
+  console.log(`📍 ${configs.length} suburb(s): ${configs.map(c => `${c.suburb} ${c.postcode}`).join(', ')}`)
+  
+  // Validate all
+  for (const config of configs) {
+    const validation = validateConfig(config)
+    if (!validation.valid) {
+      console.error(`\n❌ VALIDATION FAILED for ${config.suburb}:`)
+      validation.errors.forEach(e => console.error(`   ${e}`))
+      process.exit(1)
+    }
   }
   
-  console.log(`\n🐨 DropBear Cron Scrape`)
-  console.log(`📍 ${config.suburb} ${config.postcode} ${config.state}`)
-  
-  // Validate
-  const validation = validateConfig(config)
-  if (!validation.valid) {
-    console.error('\n❌ VALIDATION FAILED:')
-    validation.errors.forEach(e => console.error(`   ${e}`))
-    process.exit(1)
-  }
-  
-  // Construct URL
-  const url = constructUrl(config)
-  console.log(`🔗 ${url}`)
+  // Construct URLs
+  const urls = configs.map(c => constructUrl(c))
+  urls.forEach((url, i) => console.log(`🔗 [${i + 1}] ${url}`))
   
   try {
     // Start Apify run
-    console.log(`\n🚀 Starting Apify run...`)
-    const runId = await startApifyRun(url)
+    console.log(`\n🚀 Starting Apify run (${configs.length} suburbs in one batch)...`)
+    const runId = await startApifyRun(urls)
     console.log(`📊 Run ID: ${runId}`)
     
     // Wait for completion
@@ -250,26 +353,31 @@ async function main() {
     // Fetch dataset
     console.log(`📥 Fetching ${datasetId}...`)
     const items = await fetchDataset(datasetId)
-    console.log(`📋 Found ${items.length} items`)
+    console.log(`📋 Found ${items.length} items total`)
     
     // Sync to database
     console.log(`\n💾 Syncing to database...`)
-    const result = await syncToDatabase(config.suburb, items)
-    console.log(`✅ Synced: ${result.new} new, ${result.updated} updated`)
+    const results = await syncToDatabase(items, configs)
     
-    // Check for drops
-    if (result.drops.length > 0) {
-      console.log(`\n📉 ${result.drops.length} PRICE DROPS DETECTED:`)
-      for (const drop of result.drops) {
-        const dropAmount = drop.old_price - drop.new_price
-        const dropPct = ((dropAmount / drop.old_price) * 100).toFixed(1)
-        console.log(`   ${drop.address}: $${drop.old_price?.toLocaleString()} → $${drop.new_price?.toLocaleString()} (-${dropPct}%)`)
+    // Print results per suburb
+    for (const config of configs) {
+      const result = results.get(config.suburb.toLowerCase()) || { new: 0, updated: 0, drops: [] }
+      console.log(`   ${config.suburb}: ${result.new} new, ${result.updated} updated`)
+      
+      if (result.drops.length > 0) {
+        console.log(`   📉 ${result.drops.length} DROPS in ${config.suburb}:`)
+        for (const drop of result.drops) {
+          const dropAmount = drop.old_price - drop.new_price
+          const dropPct = ((dropAmount / drop.old_price) * 100).toFixed(1)
+          console.log(`      ${drop.address}: $${drop.old_price?.toLocaleString()} → $${drop.new_price?.toLocaleString()} (-${dropPct}%)`)
+        }
       }
-    } else {
-      console.log(`\n✅ No new price drops detected`)
     }
     
-    console.log(`\n✅ Done!`)
+    // Record runs
+    await recordRun(runId, datasetId, configs, results, items.length)
+    
+    console.log(`\n✅ Done! Run ID: ${runId}`)
     
   } catch (error) {
     console.error(`\n❌ Error:`, error)
