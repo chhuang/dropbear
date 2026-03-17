@@ -52,7 +52,7 @@ async function lookupSuburb(name: string): Promise<SuburbLookup | null> {
     .select('postcode, state')
     .ilike('name', name.toLowerCase())
     .limit(1)
-    .single()
+    .maybeSingle()
   
   if (error || !data) return null
   
@@ -63,7 +63,7 @@ async function lookupSuburb(name: string): Promise<SuburbLookup | null> {
   }
 }
 
-async function parseArg(arg: string): Promise<ScrapeConfig> {
+async function parseArg(arg: string, isNewAllowed: boolean = false): Promise<ScrapeConfig> {
   const parts = arg.split(':')
   
   if (parts.length < 2) {
@@ -88,8 +88,12 @@ async function parseArg(arg: string): Promise<ScrapeConfig> {
     if (!parts[2]) {
       config.state = lookup.state
     }
+  } else {
+    // Suburb not in DB - require confirmation
+    if (!isNewAllowed) {
+      throw new Error(`Suburb "${config.suburb}" not found in database. If this is a new suburb, confirm the postcode and state are correct before adding.`)
+    }
   }
-  // If not found in DB, allow it (new suburb)
   
   return config
 }
