@@ -213,7 +213,7 @@ async function startApifyRun(urls: string[]): Promise<string> {
 }
 
 async function waitForCompletion(runId: string): Promise<string> {
-  const maxWait = 180000 // 3 minutes
+  const maxWait = 600000 // 10 minutes
   const startTime = Date.now()
   
   while (Date.now() - startTime < maxWait) {
@@ -225,7 +225,11 @@ async function waitForCompletion(runId: string): Promise<string> {
       throw new Error(`Apify run ${data.data.status}: ${data.data.statusMessage}`)
     }
     
-    await new Promise(r => setTimeout(r, 5000))
+    // Print status every 30 seconds
+    const elapsed = Math.floor((Date.now() - startTime) / 1000)
+    console.log(`   ${elapsed}s elapsed, status: ${data.data.status}`)
+    
+    await new Promise(r => setTimeout(r, 30000))
   }
   
   throw new Error('Timeout waiting for Apify run')
@@ -236,6 +240,17 @@ async function fetchDataset(datasetId: string): Promise<any[]> {
     `https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_TOKEN}&clean=true`
   )
   return res.json()
+}
+
+function formatAddress(address: any): string {
+  if (!address) return ''
+  if (typeof address === 'string') return address
+  if (typeof address === 'object') {
+    // Address object from Apify: {street, suburb, state, postcode}
+    const parts = [address.street, address.suburb, address.state, address.postcode].filter(Boolean)
+    return parts.join(', ')
+  }
+  return String(address)
 }
 
 async function syncToDatabase(
@@ -271,7 +286,7 @@ async function syncToDatabase(
     
     const config = suburbConfig.get(itemSuburb)!
     const price = parsePrice(item.price)
-    const address = item.address?.value || item.address || ''
+    const address = formatAddress(item.address)
     const key = `${itemSuburb}:${listingId}`
     
     if (existingMap.has(key)) {
