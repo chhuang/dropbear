@@ -119,14 +119,19 @@ https://www.domain.com.au/sale/burwood-nsw-2134/?excludeunderoffer=1&ssubs=0
 Usage:
 ```bash
 # Validation only (free, no Apify call)
-npx tsx scripts/apify-scrape.ts --dry-run burwood 2134 NSW
+npx tsx scripts/apify-scrape.ts --dry-run burwood:2134
 
 # Single suburb
-npx tsx scripts/apify-scrape.ts burwood 2134 NSW
+npx tsx scripts/apify-scrape.ts burwood:2134
 
-# Batch mode (multiple suburbs, one Apify run - saves money!)
-npx tsx scripts/apify-scrape.ts --batch burwood:2134 chatswood:2067 manly:2095
+# Multiple suburbs (batch mode - one Apify run, saves money!)
+npx tsx scripts/apify-scrape.ts burwood:2134 chatswood:2067 manly:2095
+
+# Other states (defaults to NSW)
+npx tsx scripts/apify-scrape.ts southbank:3006:VIC
 ```
+
+Format: `suburb:postcode[:state]`
 
 ---
 

@@ -1,19 +1,23 @@
 #!/usr/bin/env npx tsx
 /**
- * DropBear Apify scraper - unified script for single/batch scraping
+ * DropBear Apify scraper
  * 
  * Usage:
- *   Dry run (validation only):  npx tsx apify-scrape.ts --dry-run burwood 2134 NSW
- *   Single suburb:              npx tsx apify-scrape.ts burwood 2134 NSW
- *   Batch mode:                 npx tsx apify-scrape.ts --batch burwood:2134 chatswood:2067 manly:2095
+ *   Dry run (validation only):  npx tsx apify-scrape.ts --dry-run burwood:2134
+ *   Single suburb:              npx tsx apify-scrape.ts burwood:2134
+ *   Multiple (batch):           npx tsx apify-scrape.ts burwood:2134 chatswood:2067 southbank:3006:VIC
+ * 
+ * Format: suburb:postcode[:state]
+ *   - State defaults to NSW if omitted
+ *   - Multiple suburbs = batch mode (one Apify run, saves money)
  * 
  * What it does:
- *   1. Validates inputs (suburb, postcode, state)
- *   2. Constructs correct Domain URLs (ssubs=0, excludeunderoffer=1)
- *   3. Calls Apify EasyApi actor
+ *   1. Validates inputs
+ *   2. Constructs Domain URLs (ssubs=0, excludeunderoffer=1)
+ *   3. Calls Apify EasyApi
  *   4. Waits for completion
- *   5. Syncs results to Supabase (listings + price_history)
- *   6. Records run in apify_runs (one row per suburb)
+ *   5. Syncs to Supabase (listings + price_history)
+ *   6. Records run per suburb
  *   7. Detects price drops
  */
 
@@ -33,6 +37,18 @@ interface ScrapeConfig {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+function parseArg(arg: string): ScrapeConfig {
+  const parts = arg.split(':')
+  if (parts.length < 2) {
+    throw new Error(`Invalid format "${arg}" - expected suburb:postcode[:state]`)
+  }
+  return {
+    suburb: parts[0].toLowerCase().trim(),
+    postcode: parts[1].trim(),
+    state: (parts[2] || 'NSW').toUpperCase()
+  }
+}
 
 function validateConfig(config: ScrapeConfig): { valid: boolean; errors: string[] } {
   const errors: string[] = []
@@ -307,41 +323,31 @@ async function main() {
   const args = process.argv.slice(2)
   
   const dryRun = args.includes('--dry-run')
-  const batchMode = args.includes('--batch')
+  const suburbArgs = args.filter(a => a !== '--dry-run' && !a.startsWith('-'))
   
-  let configs: ScrapeConfig[] = []
+  if (suburbArgs.length === 0) {
+    console.error('Usage:')
+    console.error('  Dry run:  npx tsx apify-scrape.ts --dry-run burwood:2134')
+    console.error('  Single:   npx tsx apify-scrape.ts burwood:2134')
+    console.error('  Multiple: npx tsx apify-scrape.ts burwood:2134 chatswood:2067 southbank:3006:VIC')
+    console.error('')
+    console.error('Format: suburb:postcode[:state] (state defaults to NSW)')
+    process.exit(1)
+  }
   
-  if (batchMode) {
-    // Batch mode: --batch burwood:2134 chatswood:2067
-    const batchArgs = args.filter(a => a !== '--batch' && a !== '--dry-run')
-    for (const arg of batchArgs) {
-      const [suburb, postcode, state = 'NSW'] = arg.split(':')
-      configs.push({
-        suburb: suburb.toLowerCase().trim(),
-        postcode: postcode.trim(),
-        state: state.toUpperCase()
-      })
-    }
-  } else {
-    // Single mode: burwood 2134 NSW
-    const filteredArgs = args.filter(a => a !== '--dry-run')
-    if (filteredArgs.length < 2) {
-      console.error('Usage:')
-      console.error('  Dry run:  npx tsx apify-scrape.ts --dry-run <suburb> <postcode> [state]')
-      console.error('  Single:   npx tsx apify-scrape.ts <suburb> <postcode> [state]')
-      console.error('  Batch:    npx tsx apify-scrape.ts --batch burwood:2134 chatswood:2067')
+  // Parse all suburb args
+  const configs: ScrapeConfig[] = []
+  for (const arg of suburbArgs) {
+    try {
+      configs.push(parseArg(arg))
+    } catch (e) {
+      console.error(`\n❌ ${e}`)
       process.exit(1)
     }
-    
-    configs.push({
-      suburb: filteredArgs[0].toLowerCase().trim(),
-      postcode: filteredArgs[1].trim(),
-      state: (filteredArgs[2] || 'NSW').toUpperCase()
-    })
   }
   
   console.log(`\n🐨 DropBear Scraper`)
-  console.log(`📍 ${configs.length} suburb(s): ${configs.map(c => `${c.suburb} ${c.postcode}`).join(', ')}`)
+  console.log(`📍 ${configs.length} suburb${configs.length > 1 ? 's' : ''}: ${configs.map(c => `${c.suburb} ${c.postcode}`).join(', ')}`)
   if (dryRun) console.log('🧪 DRY RUN MODE - validation only, no Apify call')
   
   // Validate all configs
@@ -381,7 +387,7 @@ async function main() {
   
   try {
     // Start Apify run
-    console.log(`\n🚀 Starting Apify run (${configs.length} suburb(s))...`)
+    console.log(`\n🚀 Starting Apify run (${configs.length} suburb${configs.length > 1 ? 's' : ''})...`)
     const runId = await startApifyRun(urls)
     console.log(`📊 Run ID: ${runId}`)
     console.log(`📈 Monitor: https://console.apify.com/actors/runs/${runId}`)
