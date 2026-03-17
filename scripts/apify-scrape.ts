@@ -3,18 +3,18 @@
  * DropBear Apify scraper
  * 
  * Usage:
- *   Dry run (validation only):  npx tsx apify-scrape.ts --dry-run burwood
- *   Single suburb:              npx tsx apify-scrape.ts burwood
- *   Multiple (batch):           npx tsx apify-scrape.ts burwood chatswood epping
- *   Explicit postcode:          npx tsx apify-scrape.ts richmond:2753
+ *   Dry run (validation only):  npx tsx apify-scrape.ts --dry-run burwood:2134
+ *   Single suburb:              npx tsx apify-scrape.ts burwood:2134
+ *   Multiple (batch):           npx tsx apify-scrape.ts burwood:2134 chatswood:2067
  *   Other state:                npx tsx apify-scrape.ts southbank:3006:VIC
  * 
- * Format: suburb[:postcode[:state]]
- *   - Looks up postcode from suburbs table if not provided
+ * Format: suburb:postcode[:state]
+ *   - Validates suburb:postcode against database
+ *   - State defaults to NSW if omitted
  *   - Multiple suburbs = batch mode (one Apify run, saves money)
  * 
  * What it does:
- *   1. Validates inputs (looks up from DB if needed)
+ *   1. Validates inputs against suburbs table
  *   2. Constructs Domain URLs (ssubs=0, excludeunderoffer=1)
  *   3. Calls Apify EasyApi
  *   4. Waits for completion
@@ -40,7 +40,13 @@ interface ScrapeConfig {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-async function lookupSuburb(name: string): Promise<{ postcode: string; state: string } | null> {
+interface SuburbLookup {
+  postcode: string
+  state: string
+  found: boolean
+}
+
+async function lookupSuburb(name: string): Promise<SuburbLookup | null> {
   const { data, error } = await supabase
     .from('suburbs')
     .select('postcode, state')
@@ -52,39 +58,40 @@ async function lookupSuburb(name: string): Promise<{ postcode: string; state: st
   
   return {
     postcode: data.postcode,
-    state: data.state.toUpperCase()
+    state: data.state.toUpperCase(),
+    found: true
   }
 }
 
 async function parseArg(arg: string): Promise<ScrapeConfig> {
   const parts = arg.split(':')
   
-  if (parts.length === 1) {
-    // Just suburb name - lookup from DB
-    const suburb = parts[0].toLowerCase().trim()
-    const lookup = await lookupSuburb(suburb)
-    
-    if (!lookup) {
-      throw new Error(`Suburb "${suburb}" not found in database. Use format: ${suburb}:<postcode>[:state]`)
-    }
-    
-    return {
-      suburb,
-      postcode: lookup.postcode,
-      state: lookup.state
-    }
+  if (parts.length < 2) {
+    throw new Error(`Invalid format "${arg}" - expected suburb:postcode[:state]`)
   }
   
-  if (parts.length >= 2) {
-    // Explicit format: suburb:postcode[:state]
-    return {
-      suburb: parts[0].toLowerCase().trim(),
-      postcode: parts[1].trim(),
-      state: (parts[2] || 'NSW').toUpperCase()
-    }
+  const config: ScrapeConfig = {
+    suburb: parts[0].toLowerCase().trim(),
+    postcode: parts[1].trim(),
+    state: (parts[2] || 'NSW').toUpperCase()
   }
   
-  throw new Error(`Invalid format "${arg}" - expected suburb[:postcode[:state]]`)
+  // Validate against database
+  const lookup = await lookupSuburb(config.suburb)
+  
+  if (lookup) {
+    // Suburb exists in DB - verify postcode matches
+    if (lookup.postcode !== config.postcode) {
+      throw new Error(`Postcode mismatch for "${config.suburb}": you provided ${config.postcode}, but database has ${lookup.postcode}`)
+    }
+    // Use state from DB if more accurate
+    if (!parts[2]) {
+      config.state = lookup.state
+    }
+  }
+  // If not found in DB, allow it (new suburb)
+  
+  return config
 }
 
 function validateConfig(config: ScrapeConfig): { valid: boolean; errors: string[] } {
@@ -364,14 +371,14 @@ async function main() {
   
   if (suburbArgs.length === 0) {
     console.error('Usage:')
-    console.error('  Dry run:  npx tsx apify-scrape.ts --dry-run burwood')
-    console.error('  Single:   npx tsx apify-scrape.ts burwood')
-    console.error('  Multiple: npx tsx apify-scrape.ts burwood chatswood epping')
-    console.error('  Explicit: npx tsx apify-scrape.ts richmond:2753')
+    console.error('  Dry run:  npx tsx apify-scrape.ts --dry-run burwood:2134')
+    console.error('  Single:   npx tsx apify-scrape.ts burwood:2134')
+    console.error('  Multiple: npx tsx apify-scrape.ts burwood:2134 chatswood:2067')
     console.error('  Other state: npx tsx apify-scrape.ts southbank:3006:VIC')
     console.error('')
-    console.error('Format: suburb[:postcode[:state]]')
-    console.error('  - Looks up postcode from suburbs table if not provided')
+    console.error('Format: suburb:postcode[:state]')
+    console.error('  - Validates suburb:postcode against database')
+    console.error('  - State defaults to NSW if omitted')
     process.exit(1)
   }
   
